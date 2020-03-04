@@ -115,10 +115,11 @@ func Create(path string, mapCap, keyLen, valueLen int, wait time.Duration) (m *M
 	hdr.dataOff = hdr.hashOff + uint32(hashSize)
 	// total size, header + hash + buckets
 	size := int(hdr.dataOff) + int(hdr.cap*hdr.bucketSize)
-	mp, err := database.Open(path, size, wait)
+	mp, ul, err := database.Open(path, size, wait)
 	if err != nil {
 		return
 	}
+	defer ul()
 	m = &Map{
 		mp: mp,
 	}
