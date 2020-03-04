@@ -7,7 +7,7 @@ import (
 
 // Open a database file, return a mapping
 func Open(path string, size int) (m *mapping.Mapping, err error) {
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0777)
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0664)
 	if err != nil {
 		return
 	}
