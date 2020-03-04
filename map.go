@@ -183,8 +183,8 @@ func (m *Map) Get(key string, add bool) (b []byte, err error) {
 			target.setKey(m, key)
 			target.hash = h
 		}
-		// lock succeed if index and serial not are changed
-		if ptr.lock(index, serial) {
+		// lock succeed if serial not changed
+		if ptr.lock(serial) {
 			target.next = index
 			ptr.setIndex(newIdx)
 			target.used = 1
@@ -233,8 +233,8 @@ func (m *Map) Delete(key string) bool {
 		if target == nil {
 			return true
 		}
-		// lock succeed if index and serial not are changed
-		if ptr.lock(index, serial) {
+		// lock succeed if serial not changed
+		if ptr.lock(serial) {
 			target.used = 0
 			if last != nil {
 				last.next = target.next
@@ -390,9 +390,9 @@ func (h *hash) setIndex(index int32) {
 }
 
 // lock the bucket chain
-func (h *hash) lock(index, serial int32) bool {
+func (h *hash) lock(serial int32) bool {
 	if atomic.CompareAndSwapInt32(&(*h)[2], 0, 1) {
-		if index == (*h)[0] && serial == (*h)[1] {
+		if serial == (*h)[1] {
 			return true
 		}
 		atomic.StoreInt32(&(*h)[2], 0)
