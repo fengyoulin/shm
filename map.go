@@ -7,6 +7,7 @@ import (
 	"hash/crc32"
 	"reflect"
 	"sync/atomic"
+	"time"
 	"unsafe"
 )
 
@@ -75,7 +76,7 @@ var (
 )
 
 // Create or open a shared map database
-func Create(path string, mapCap, keyLen, valueLen int) (m *Map, err error) {
+func Create(path string, mapCap, keyLen, valueLen int, wait time.Duration) (m *Map, err error) {
 	var hdr header
 	if mapCap <= 0 || mapCap > maxMapCap {
 		err = ErrMapCap
@@ -114,7 +115,7 @@ func Create(path string, mapCap, keyLen, valueLen int) (m *Map, err error) {
 	hdr.dataOff = hdr.hashOff + uint32(hashSize)
 	// total size, header + hash + buckets
 	size := int(hdr.dataOff) + int(hdr.cap*hdr.bucketSize)
-	mp, err := database.Open(path, size)
+	mp, err := database.Open(path, size, wait)
 	if err != nil {
 		return
 	}

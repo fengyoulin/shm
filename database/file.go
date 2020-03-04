@@ -1,12 +1,44 @@
 package database
 
 import (
+	"errors"
 	"github.com/fengyoulin/shm/mapping"
 	"os"
+	"time"
 )
 
+// ErrTimeout when waiting for database init
+var ErrTimeout = errors.New("timeout when waiting for database init")
+
 // Open a database file, return a mapping
-func Open(path string, size int) (m *mapping.Mapping, err error) {
+func Open(path string, size int, wait time.Duration) (m *mapping.Mapping, err error) {
+	var lock *os.File
+	name := path + ".lock"
+	for i := 0; i < int(wait/time.Millisecond/10); i++ {
+		lock, err = os.OpenFile(name, os.O_CREATE|os.O_EXCL, 0664)
+		if err == nil {
+			break
+		}
+		if !os.IsExist(err) {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if err != nil {
+		err = ErrTimeout
+		return
+	}
+	unlock := func() {
+		if lock == nil {
+			return
+		}
+		_ = lock.Close()
+		lock = nil
+		if e := os.Remove(name); err == nil {
+			err = e
+		}
+	}
+	defer unlock()
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0664)
 	if err != nil {
 		return
@@ -36,5 +68,6 @@ func Open(path string, size int) (m *mapping.Mapping, err error) {
 			}
 		}
 	}
+	unlock()
 	return mapping.Create(f)
 }

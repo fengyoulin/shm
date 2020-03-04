@@ -9,10 +9,11 @@ package main
 import (
 	"github.com/fengyoulin/shm"
 	"log"
+	"time"
 )
 
 func main() {
-	m, err := shm.Create("map.db", 4096, 40, 32)
+	m, err := shm.Create("map.db", 4096, 40, 32, time.Second)
 	if err != nil {
 		log.Fatalln(err)
 	}
