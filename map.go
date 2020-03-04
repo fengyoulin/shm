@@ -27,10 +27,9 @@ type header struct {
 	bucketSize int32
 	hashOff    uint32
 	dataOff    uint32
-	lock       int32
 	next       int32
 	deleteLink int32
-	_          [7]int32
+	_          [8]int32
 }
 
 // hash as [4]int32
@@ -282,13 +281,6 @@ func (m *Map) init(h *header) error {
 	data := m.mp.Bytes()
 	sh := (*reflect.SliceHeader)(unsafe.Pointer(&data))
 	head := (*header)(unsafe.Pointer(sh.Data))
-	// spinlock with max try limit
-	for i := 0; i < 1000000 && !atomic.CompareAndSwapInt32(&head.lock, 0, 1); i++ {
-	}
-	// spinlock unlock
-	defer func() {
-		atomic.StoreInt32(&head.lock, 0)
-	}()
 	if head.cap != 0 {
 		// this branch opened a exist db
 		if head.cap != h.cap ||
