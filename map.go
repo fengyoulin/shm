@@ -36,7 +36,7 @@ type header struct {
 // 1st for index
 // 2nd for serial
 // 3rd for lock
-// 4th leave blank
+// 4th for chain len, debug purpose
 type hash [4]int32
 
 // bucket header
@@ -188,7 +188,9 @@ func (m *Map) Get(key string, add bool) (b []byte, err error) {
 			target.next = index
 			ptr.setIndex(newIdx)
 			target.used = 1
+			ptr.addLength(1)
 			ptr.unlock()
+			atomic.AddInt32(&m.head.len, 1)
 			b = target.value(m)
 			return
 		}
@@ -239,7 +241,9 @@ func (m *Map) Delete(key string) bool {
 			} else {
 				ptr.setIndex(target.next)
 			}
+			ptr.addLength(-1)
 			ptr.unlock()
+			atomic.AddInt32(&m.head.len, -1)
 			m.free(idx)
 			return true
 		}
@@ -259,6 +263,16 @@ func (m *Map) Foreach(fn func(key string, value []byte) bool) {
 			return
 		}
 	}
+}
+
+// Cap return map capacity, cannot grow
+func (m *Map) Cap() int {
+	return int(m.head.cap)
+}
+
+// Len return item count in map
+func (m *Map) Len() int {
+	return int(atomic.LoadInt32(&m.head.len))
 }
 
 // from a exist db, or a newly created one
@@ -390,6 +404,16 @@ func (h *hash) lock(index, serial int32) bool {
 func (h *hash) unlock() {
 	(*h)[1]++
 	atomic.StoreInt32(&(*h)[2], 0)
+}
+
+// chain length
+func (h *hash) length() int {
+	return int((*h)[3])
+}
+
+// add delta to chain length
+func (h *hash) addLength(delta int) {
+	(*h)[3] += int32(delta)
 }
 
 // find chain

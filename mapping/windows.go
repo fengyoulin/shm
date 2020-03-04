@@ -16,6 +16,9 @@ type Mapping struct {
 	addr   uintptr
 }
 
+// SEC_COMMIT for mapping
+const SEC_COMMIT = 0x8000000
+
 // Bytes return mapped memory
 func (m *Mapping) Bytes() (b []byte) {
 	h := (*reflect.SliceHeader)(unsafe.Pointer(&b))
@@ -32,12 +35,12 @@ func Create(file *os.File) (m *Mapping, err error) {
 		return
 	}
 	size := info.Size()
-	handle, err := windows.CreateFileMapping(windows.Handle(file.Fd()), nil, windows.PAGE_READWRITE|0x8000000, 0, uint32(size), nil)
+	handle, err := windows.CreateFileMapping(windows.Handle(file.Fd()), nil, windows.PAGE_READWRITE|SEC_COMMIT, 0, 0, nil)
 	if err != nil {
 		panic(err)
 		return
 	}
-	addr, err := windows.MapViewOfFile(handle, windows.FILE_MAP_WRITE, 0, 0, uintptr(size))
+	addr, err := windows.MapViewOfFile(handle, windows.FILE_MAP_WRITE, 0, 0, 0)
 	if err != nil {
 		_ = windows.CloseHandle(handle)
 		return
