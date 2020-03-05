@@ -13,6 +13,7 @@ const (
 	testFileName = "testdb.db"
 	testMapCap   = 4 * 1024 * 1024
 	testValLen   = 8
+	testMaxTry   = 20
 	initWait     = 10 * time.Second
 )
 
@@ -20,7 +21,7 @@ var testMap *Map
 
 func TestCreate(t *testing.T) {
 	var err error
-	testMap, err = Create(testFileName, testMapCap, 2*testValLen, testValLen, initWait)
+	testMap, err = Create(testFileName, testMapCap, 2*testValLen, testValLen, testMaxTry, initWait)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +86,7 @@ func TestMap_Close(t *testing.T) {
 func BenchmarkMap_GetOrAdd(b *testing.B) {
 	// create
 	var err error
-	testMap, err = Create(testFileName, testMapCap, 2*testValLen, testValLen, initWait)
+	testMap, err = Create(testFileName, testMapCap, 2*testValLen, testValLen, testMaxTry, initWait)
 	if err != nil {
 		b.Fatal(err)
 	}

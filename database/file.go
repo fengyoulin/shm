@@ -11,7 +11,7 @@ import (
 var ErrTimeout = errors.New("timeout when waiting for database init")
 
 // Open a database file, return a mapping
-func Open(path string, size int, wait time.Duration) (m *mapping.Mapping, unlock func(), err error) {
+func Open(path string, size int, wait time.Duration) (m *mapping.Mapping, unlock func() error, err error) {
 	var lock *os.File
 	name := path + ".lock"
 	for i := 0; i < int(wait/time.Millisecond/10); i++ {
@@ -28,18 +28,20 @@ func Open(path string, size int, wait time.Duration) (m *mapping.Mapping, unlock
 		err = ErrTimeout
 		return
 	}
-	uf := func() {
-		_ = lock.Close()
-		lock = nil
-		if e := os.Remove(name); err == nil {
-			err = e
+	uf := func() (er error) {
+		er = lock.Close()
+		if e := os.Remove(name); er == nil {
+			er = e
 		}
+		return
 	}
 	defer func() {
 		if uf == nil {
 			return
 		}
-		uf()
+		if e := uf(); err == nil {
+			err = e
+		}
 	}()
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0664)
 	if err != nil {

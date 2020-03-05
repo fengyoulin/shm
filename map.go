@@ -17,6 +17,7 @@ type Map struct {
 	head *header
 	hash *[maxMapCap]hash
 	data uintptr
+	try  int
 }
 
 // header in database
@@ -54,7 +55,6 @@ const (
 	minKeySize = 8
 	maxKeySize = 256
 	maxBktSize = 4096
-	maxTries   = 20
 )
 
 var (
@@ -75,8 +75,11 @@ var (
 )
 
 // Create or open a shared map database
-func Create(path string, mapCap, keyLen, valueLen int, wait time.Duration) (m *Map, err error) {
+func Create(path string, mapCap, keyLen, valueLen, maxTry int, wait time.Duration) (m *Map, err error) {
 	var hdr header
+	if maxTry <= 0 {
+		maxTry = 20
+	}
 	if mapCap <= 0 || mapCap > maxMapCap {
 		err = ErrMapCap
 		return
@@ -118,11 +121,19 @@ func Create(path string, mapCap, keyLen, valueLen int, wait time.Duration) (m *M
 	if err != nil {
 		return
 	}
-	defer ul()
+	defer func() {
+		// close db if unlock failed
+		if e := ul(); e != nil && err == nil {
+			err = e
+			_ = m.Close()
+		}
+	}()
 	m = &Map{
-		mp: mp,
+		mp:  mp,
+		try: maxTry,
 	}
 	err = m.init(&hdr)
+	// close db if init failed
 	if err != nil {
 		_ = m.Close()
 		return
@@ -152,9 +163,15 @@ func (m *Map) Get(key string, add bool) (b []byte, err error) {
 		return
 	}
 	ptr := m.hashPtr(h)
-	try := maxTries
+	try := m.try
 	var newIdx int32
 	var target *bucket
+	defer func() {
+		if target != nil {
+			m.free(newIdx)
+		}
+	}()
+	var lastCheck bool
 	for try > 0 {
 		try--
 		index := ptr.index()
@@ -169,6 +186,11 @@ func (m *Map) Get(key string, add bool) (b []byte, err error) {
 			b = bkt.value(m)
 			return
 		}
+		// last check on no space
+		if lastCheck {
+			err = ErrDbFull
+			return
+		}
 		// not found
 		if !add {
 			err = ErrKeyNot
@@ -177,6 +199,11 @@ func (m *Map) Get(key string, add bool) (b []byte, err error) {
 		if target == nil {
 			newIdx = m.alloc()
 			if newIdx < 0 {
+				// maybe just added by some other, do last check
+				if ptr.serial() != serial {
+					lastCheck = true
+					continue
+				}
 				err = ErrDbFull
 				return
 			}
@@ -193,11 +220,9 @@ func (m *Map) Get(key string, add bool) (b []byte, err error) {
 			ptr.unlock()
 			atomic.AddInt32(&m.head.len, 1)
 			b = target.value(m)
+			target = nil
 			return
 		}
-	}
-	if target != nil {
-		m.free(newIdx)
 	}
 	return nil, ErrTryEnd
 }
@@ -212,7 +237,7 @@ func (m *Map) Delete(key string) bool {
 		return false
 	}
 	ptr := m.hashPtr(h)
-	try := maxTries
+	try := m.try
 	for try > 0 {
 		try--
 		index := ptr.index()

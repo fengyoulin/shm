@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	m, err := shm.Create("map.db", 4096, 40, 32, time.Second)
+	m, err := shm.Create("map.db", 4096, 40, 32, 20, time.Second)
 	if err != nil {
 		log.Fatalln(err)
 	}
